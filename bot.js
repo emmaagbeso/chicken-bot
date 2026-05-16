@@ -1,5 +1,11 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys')
 const pino = require('pino')
+const http = require('http')
+
+// Keep Render happy with a dummy web server
+http.createServer((req, res) => res.end('Bot running')).listen(3000)
+
+let pairingRequested = false
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info')
@@ -11,7 +17,8 @@ async function startBot() {
         browser: ['Chrome (Linux)', '', '']
     })
 
-    if (!sock.authState.creds.registered) {
+    if (!sock.authState.creds.registered && !pairingRequested) {
+        pairingRequested = true
         await new Promise(r => setTimeout(r, 3000))
         const phoneNumber = '2348106712645'
         try {
@@ -21,6 +28,7 @@ async function startBot() {
             console.log(`============================`)
         } catch (e) {
             console.log('Pairing code error:', e.message)
+            pairingRequested = false
         }
     }
 
@@ -28,11 +36,12 @@ async function startBot() {
         if (connection === 'close') {
             const code = lastDisconnect?.error?.output?.statusCode
             const shouldReconnect = code !== DisconnectReason.loggedOut
-            console.log('Connection closed, code:', code)
+            console.log('Connection closed, reconnecting...')
             if (shouldReconnect) setTimeout(() => startBot(), 5000)
         }
         if (connection === 'open') {
-            console.log('✅ Bot connected!')
+            console.log('Bot connected!')
+            pairingRequested = false
         }
     })
 
@@ -45,7 +54,7 @@ async function startBot() {
         const text = msg.message.conversation ||
                      msg.message.extendedTextMessage?.text || ''
         console.log(`Message: ${text}`)
-        await sock.sendMessage(from, { text: 'Bot is working! 🍗' })
+        await sock.sendMessage(from, { text: 'Bot is working!' })
     })
 }
 
