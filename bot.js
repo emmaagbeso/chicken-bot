@@ -2,8 +2,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const pino = require('pino')
 const http = require('http')
 
-// Keep Render happy with a dummy web server
-http.createServer((req, res) => res.end('Bot running')).listen(3000)
+http.createServer((req, res) => res.end('Bot running')).listen(process.env.PORT || 3000)
 
 let pairingRequested = false
 
@@ -14,18 +13,19 @@ async function startBot() {
         auth: state,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: false,
-        browser: ['Chrome (Linux)', '', '']
+        browser: ['WhatsApp Business', '', '']
     })
 
     if (!sock.authState.creds.registered && !pairingRequested) {
         pairingRequested = true
-        await new Promise(r => setTimeout(r, 3000))
+        await new Promise(r => setTimeout(r, 5000))
         const phoneNumber = '2348106712645'
         try {
             const code = await sock.requestPairingCode(phoneNumber)
             console.log(`============================`)
             console.log(`PAIRING CODE: ${code}`)
             console.log(`============================`)
+            console.log('Enter this code in WhatsApp Business > Linked Devices > Link with phone number')
         } catch (e) {
             console.log('Pairing code error:', e.message)
             pairingRequested = false
@@ -36,11 +36,13 @@ async function startBot() {
         if (connection === 'close') {
             const code = lastDisconnect?.error?.output?.statusCode
             const shouldReconnect = code !== DisconnectReason.loggedOut
-            console.log('Connection closed, reconnecting...')
+            console.log('Connection closed, code:', code, '— reconnecting:', shouldReconnect)
             if (shouldReconnect) setTimeout(() => startBot(), 5000)
         }
         if (connection === 'open') {
-            console.log('Bot connected!')
+            console.log('============================')
+            console.log('BOT CONNECTED SUCCESSFULLY!')
+            console.log('============================')
             pairingRequested = false
         }
     })
@@ -53,7 +55,7 @@ async function startBot() {
         const from = msg.key.remoteJid
         const text = msg.message.conversation ||
                      msg.message.extendedTextMessage?.text || ''
-        console.log(`Message: ${text}`)
+        console.log(`Message from ${from}: ${text}`)
         await sock.sendMessage(from, { text: 'Bot is working!' })
     })
 }
