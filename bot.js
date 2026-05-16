@@ -7,20 +7,29 @@ async function startBot() {
     const sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        browser: ['Chrome (Linux)', '', '']
     })
 
-    // Use pairing code instead of QR
     if (!sock.authState.creds.registered) {
-        const phoneNumber = '2348106712645' // e.g. 2348012345678 (with country code, no + or spaces)
-        const code = await sock.requestPairingCode(phoneNumber)
-        console.log(`Your pairing code: ${code}`)
+        await new Promise(r => setTimeout(r, 3000))
+        const phoneNumber = '2348106712645'
+        try {
+            const code = await sock.requestPairingCode(phoneNumber)
+            console.log(`============================`)
+            console.log(`PAIRING CODE: ${code}`)
+            console.log(`============================`)
+        } catch (e) {
+            console.log('Pairing code error:', e.message)
+        }
     }
 
     sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-            if (shouldReconnect) startBot()
+            const code = lastDisconnect?.error?.output?.statusCode
+            const shouldReconnect = code !== DisconnectReason.loggedOut
+            console.log('Connection closed, code:', code)
+            if (shouldReconnect) setTimeout(() => startBot(), 5000)
         }
         if (connection === 'open') {
             console.log('✅ Bot connected!')
@@ -32,11 +41,9 @@ async function startBot() {
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0]
         if (!msg.message || msg.key.fromMe) return
-
         const from = msg.key.remoteJid
         const text = msg.message.conversation ||
                      msg.message.extendedTextMessage?.text || ''
-
         console.log(`Message: ${text}`)
         await sock.sendMessage(from, { text: 'Bot is working! 🍗' })
     })
